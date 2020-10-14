@@ -256,3 +256,102 @@ import { CatsController } from "./cats/cats.controller";
 })
 export class AppModule {}
 ```
+
+## provider
+
+Nest의 기본적인 컨셉이라고 한다. 네스트의 여러가지 개체들이 provider로 취급된다.  
+**의존성을 주입**한다는 컨셉이 골자다. 데코레이터로 하는 간단한 의존성 주입으로 개체들은 서로 쉽게 다양한 관계를 맺을 수 있게 되고, 런타임에 돌아갈 수 있게 된다.
+
+ @Injectable 데코레이터를 사용한다. 컨트롤러에 반복되는 로직이나, 단순하지 않고 조금더 복잡한 컨트롤러 로직을 만드는데 사용되는 거 같다. Nest는 SOLID를 좋아한다는 말을 굳이 하는것으로 보아 **의존성 역전 원칙**을 좋아하는 거 같다.
+
+### Services
+
+컨트롤러에서 서비스 로직을 분리하는 거 
+
+```ts
+// cats.service.ts
+
+import { Injectable } from "@nestjs/common";
+import { Cat } from "./interfaces/cat.interface";
+
+export interface Cat {
+  name: string;
+  age: number;
+  bread: string;
+}
+
+// 얘는 네스트가 프로바이더임을 알 수 있게 메타데이터를 붙여주는 데코레이터
+// 주입될 수 있는 서비스 로직이 되는 것이다
+@Injectable()
+export class CatService {
+  private readonly cats: Cat[] = [];
+
+  create(cat: Cat) {
+    this.cats.push(cat);
+  }
+
+  findAll(): Cat[] {
+    return this.cats;
+  }
+}
+```
+
+컨트롤러는 이렇게 됨
+
+```ts
+import { Controller, Get, Post, Body } from "@nestjs/common";
+import { CreateCatDto } from "./dto/create-cat.dto";
+import { CatsService } from "./cats.service";
+import { Cat } from "./interfaces/cat.interface";
+
+// typeDi같다
+@Controller("cats")
+export class CatsController {
+  // 컨스트럭터에서 멤버변수로 바로 쓸 수 있게 해준다
+  constructor(private catsService: CatService) {}
+
+  @Post()
+  async create(@Body() createCatDto: CreateCatDto) {
+    // 마구 서비스 로직을 사용할 수 있다.
+    this.catsService.create(createCatDto);
+  }
+
+  @Get()
+  async findAll(): Promise<Cat[]> {
+    return this.catsService.findAll();
+  }
+}
+```
+
+### 그래서 의존성 주입
+
+```ts
+// constructor 타입 선언으로 바로 인스턴스를 사용할 수 있는 타입스크립트 문법
+// 생성자를 사용해 개체를 만들어 줄 필요가 없어진다
+// 즉 클래스를 인자로써만 사용 가능한 것이다. 함수 내부에서 만들어서 의존성을 만들 필요가 없어진다.
+
+constructor(private catsService: CatsService) {}
+```
+
+### 스코프
+
+- 프로바이더는 어플리케이션의 라이프사이클과 같이 수명을 갖는다. 
+- 어플리케이션이 실행되면, 모든 dependency를 nest가 리졸브하고 프로바이더를 쓸 수 있게 된다.
+- 어플리케이션이 shut down 되는 경우에도 프로바이더들은 사망한다
+- 리퀘스트 범위에서 프로바이더를 죽였다 살렸다 할 수 있는 방법이 있는 것 같다.
+
+### 프로바이더 등록
+
+아까와 같이 진입점에다가 프로바이더 배열에 등록해준다.
+
+```ts
+import { Module } from '@nestjs/common';
+import { CatsController } from './cats/cats.controller';
+import { CatsService } from './cats/cats.service';
+
+@Module({
+  controllers: [CatsController],
+  providers: [CatsService],
+})
+export class AppModule {}
+```
