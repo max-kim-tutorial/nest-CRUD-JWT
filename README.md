@@ -339,10 +339,54 @@ constructor(private catsService: CatsService) {}
 - 어플리케이션이 실행되면, 모든 dependency를 nest가 리졸브하고 프로바이더를 쓸 수 있게 된다.
 - 어플리케이션이 shut down 되는 경우에도 프로바이더들은 사망한다
 - 리퀘스트 범위에서 프로바이더를 죽였다 살렸다 할 수 있는 방법이 있는 것 같다.
+- DEFAULT 스코프 : 싱글 인스턴스 프로바이더(싱글톤 - 클래스의 인스턴스는 전체 어플리케이션을 통틀어 단 하나) 프로바이더의 생명주기가 어플리케이션과 같이 이루어진다. 아무런 옵션이 없으면 DEFAULT로 쓰이는것
+- REQUEST 스코프 : 프로바이더 인스턴스가 incoming request가 존재할때 생성되고 죽는다. 인스턴스는 리퀘스트가 처리되면 GC된다
+- TRANSIENT 스코프 : 프로바이더의 소비자들 사이에서 공유되지 않는 프로바이더들이다. 깊은복사처럼 소비자에게 의존성이 주입될때 생성되므로 각 소비자들마다 각각의 다른 인스턴스가 생성된다.
+- 싱글톤을 쓰는게 추천된다. 초기화가 어플리케이션 시작할때 딱 한번만 되는거니까 계속 돌리는 상황에서 캐싱도 되고 그렇고
+
+```ts
+// 요런식으로 등록해준다
+import { Injectable, Scope } from '@nestjs/common';
+
+@Injectable({ scope: Scope.REQUEST })
+export class CatsService {}
+```
+
+### 선택적 프로바이더
+
+```ts
+import { Injectable, Optional, Inject } from "@nestjs/common";
+
+@Injectable()
+export class HttpService<T> {
+  // 커스텀 토큰??
+  constructor(@Optional() @Inject("HTTP_OPTIONS") private httpClient: T) {}
+}
+```
+
+- 주입하다보면 필요없는 의존성이 있을 수도 있는데 생성자에 optional 데코레이터를 사용한다.
+- 저 상황에서는 타입 인자가 들어오지 않으면 default가 사용되는 그런걸가
+- 잘 몰게따
+
+### 프로퍼티 기반 주입
+
+```ts
+import { Injectable, Inject } from "@nestjs/common";
+
+@Injectable()
+export class HttpService<T> {
+  @Inject("HTTP_OPTIONS")
+  private readonly httpClient: T;
+}
+```
+
+- 위에서 계속 썼던 기술은 생성자 기반 주입, 특별한 경우에는 프로퍼티 기반 주입을 사용할 수 있는데 
+- 최상위 클래스가 하나 또는 다수의 프로바이더에게 의존성을 가지고 있다면 하위 클래스에서 super을 넘겨주는 것은 그렇게 좋은 방법은 또 아니다. 이러한 경우를 피하기 위해서 @inject 데코레이터를 프로퍼티(멤버변수)에게도 사용할 수 있다.
 
 ### 프로바이더 등록
 
-아까와 같이 진입점에다가 프로바이더 배열에 등록해준다.
+- 아까와 같이 진입점에다가 프로바이더 배열에 등록해준다.
+- 디렉토리 나누는 법을 좀 탐구해봐야 할 것 같다.
 
 ```ts
 import { Module } from '@nestjs/common';
