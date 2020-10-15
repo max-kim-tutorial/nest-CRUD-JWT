@@ -399,3 +399,181 @@ import { CatsService } from './cats/cats.service';
 })
 export class AppModule {}
 ```
+
+## 모듈
+
+모듈은 @module 데코레이터로 어노테이트한다. 이 데코레이터는 어플리케이션의 구조를 만들 수 있도록 메타데이터를 제공하는 역할을 한다.
+
+모듈은 계층 구조를 이루고 있고, 각 앱은 하나의 root module이 있다. 이 모듈은 어플리케이션 그래프를 만들어낼 진입점을 잡아준다. 아주 작은 앱들은 이론적으로 하나의 진입점, 하나의 모듈만을 필요로 하겠지만, 여러가지 모듈들을 사용하고 연관된 capability의 모음으로 캡슐화 하는것이 보통이다. @module이 인자에서 갖는 객체는 providers, controllers, imports, exports가 있다.
+
+- imports : 임포트된 모듈들의 리스트이고, 이 리스트의 모듈들은 데코레이터에서 사용중인 모듈에서 필요한 providers를 export하고 있어야 한다.
+- exports: providers의 하위 집합으로 데코레이터를 사용중인 모듈이 제공받은 provider의 일부를 내보낸다.
+
+### 기능 모듈
+
+- 컨트롤러와 그 컨트롤러에서 쓰이는 서비스 클래스는 같은 어플리케이션 영역으로 서로 연관이 깊기 때문에 묶을 수 있다. 
+- 이렇게 관심사로 묶고 조직적으로 유지하는 것은 개발하는데 복잡성을 줄여준다.
+
+```ts
+// 관심사가 같은 것끼리 하나의 모듈로 묶는다
+// cats/cats.module.ts
+
+import {Module} from "@nestjs/common";
+import {CatsController} from "./cats.controller";
+import {CatsService} from "./cats.service";
+
+@Module({
+    controllers: [CatsController],
+    providers: [CatsService]
+})
+export class CatsModule {}
+```
+
+- 묶은 모듈은 진입점에서, imports로 등록한다.
+
+```ts
+// app.module.ts
+
+import {Module} from "@nestjs/common";
+import {CatsModule} from "./cats/cats.module";
+
+@Module({
+    imports: [CatsModule]
+})
+export class AppModule{}
+
+// 디렉토리 구조
+src/
+    cats/
+        dto/
+            create-cat.dto.ts
+        interfaces/
+            cat.interface.ts
+        cats.service.ts
+        cats.controller.ts
+        cats.module.ts
+    app.module.ts
+    main.ts
+```
+
+### 공유 모듈
+
+- Nest에서 모듈들은 기본적으로 싱글톤이고, 그렇기 때문에 어떠한 provider의 인스턴스든 여러 모듈에서 **동일한 인스턴스를** 공유할 수 있다.
+- 아래와 같이 하면 Catsmodule을 임포트하는 어떤 모듈에서든 CatsService를 사용할 수 있다.
+
+```ts
+// cats.module.ts
+
+// 해당 모듈에서 provider로 선언한 모듈을 다른 모듈에서도 쓰고싶다면?
+import {Module} from "@nestjs/common";
+import {CatsController} from "./cats.controller";
+import {CatsService} from "./cats.service";
+
+@Module({
+    controllers: [CatsController],
+    providers: [CatsService],
+    // 다른 모듈에서 쓸 수 있도록 export 배열에 추가한다.
+    exports: [CatsService]
+})
+export class CatsModule {}
+```
+
+### 다시 내보내기
+
+- 모듈은 import 해온 것을 export할 수 있다 의존성 주입하는 방식으로 가능하다.
+- 모듈 클래스 자체는 프로바이더
+
+```ts
+@Module({
+  imports: [CommonModule],
+  exports: [CommonModule],
+})
+export class CoreModule {}
+```
+
+
+### 의존성 주입
+
+- export되는 모듈의 constructor에 import한 모듈의 의존성을 주입할 수 있다.
+- 클래스 모듈 자체는 순환참조 문제때문에 안된다.
+- 네스트에서는 순환참조 문제가 모듈과 프로바이더 사이에서 발생할 수 있다. forwardRef라는 유틸함수를 써서 해결할 수 있다. 아직 정의되지 않은 클래스를 reference하게 해주는 함수임.
+
+```ts
+// cats.module.ts
+import {Module} from "@nestjs/common";
+import {CatsController} from "./cats.controller";
+import {CatsService} from "./cats.service";
+
+@Module({
+    controllers: [CatsController],
+    providers: [CatsService]
+})
+export class CatsModule {
+    constructor(private catsService: CatsService) {}
+}
+```
+
+### 글로벌 모듈
+
+- Nest에서는 프로바이더들을 전역 범위가 아닌 **모듈 스코프** 안에서 캡슐화 한다. 앞서 캡슐화된 모듈들을 임포트하지 않는다면, 모듈의 provider을 사용할 수 없다.
+- 그래서 @global() 데코레이터를 통해 전역 모듈을 선언해줄 수 있다.
+- 글로벌 모듈은 앱 시작할때 딱 한번 register되고 루트나 코어 모듈을 통해서 generate된다. 
+- 글로벌 모듈은 import 배열에 모듈을 선언하지 않아도 사용할 수 있게 된다.
+- 물론 필요할때만 쓰는게 좋겠다
+
+```ts
+import { Module, Global } from '@nestjs/common';
+import { CatsController } from './cats.controller';
+import { CatsService } from './cats.service';
+
+@Global()
+@Module({
+  controllers: [CatsController],
+  providers: [CatsService],
+  exports: [CatsService],
+})
+export class CatsModule {}
+```
+
+### 동적 모듈
+
+- 커스텀 가능한, 일종의 추상 클래스를 만들 수 있다.
+- 커스텀 가능한 모듈은 provider을 동적으로 설정하고 등록할 수 있게 해준다.
+
+```ts
+import {Module, DynamicModule} from "@nestjs/common";
+import {createDatabaseProviders} from "./database.providers";
+import {Connection} from "./connection.provider";
+
+@Module({
+    // 커넥션 모듈
+    providers: [Connection]
+})
+export class DatabaseModule {
+    // 정적 메소드 => 다이나믹 모듈을 리턴함
+    // 인자에 따라서 추가적인 프로바이더를 리턴할 수 있게 된다
+    // 오버라이드되는것이 아니고 기본 module 메타데이터에서 extend된다.
+    // 요 모듈에서는 데이터베이스의 connection과 repository가 동적으로 리턴된다.
+    static forRoot(entities = [], options?): DynamicModule {
+        const providers = createDatabaseProviders(options, entities);
+        return {
+            module: DatabaseModule,
+            providers,
+            exports: providers
+        }
+    }
+}
+```
+
+메인 모듈에서는 이런식으로 설정된다.
+
+```ts
+import {Module} from "@nestjs/common"
+import {DatabaseModule} from "./database/database.module";
+import {User} from "./users/entities/user.entity";
+
+@Module({
+    imports: [DatabaseModule.forRoot([User])]
+})
+export class AppModule{}
+```
