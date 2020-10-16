@@ -1,6 +1,6 @@
 # Nest-CRUD-JWT
 
-Nest.js로 구현하는 CRUD + JWT 인증
+Nest.js로 구현하는 CRUD(게시판 앱) + JWT 인증
 
 ## 보일러플레이트 구조
 
@@ -717,3 +717,120 @@ app.use(logger);
 await app.listen(3000);
 ```
 
+## Exception Filter
+
+Nest에는 핸들링되지 않은 모든 예외들에 대해 반응하도록 하는 내장된 예외 레이어가 있다. 핸들링되지 않는 예외가 있다면 이 레이어에서 잡아서 자동으로 적절한 응답을 보내준다(ㄷㄷ)
+
+HttpException 타입의 예외를 처리하는 내장된 글로벌 예외 처리기에 의해 동작하는 것으로, 예외가 인식되지 않는 경우에 내장된 예외 처리기가 500 응답을 알아서 보내준다(ㄷㄷ). 에러 핸들러 미들웨어같은걸 달아주지 않아도 된다.
+
+### 표준 예외 스로잉
+
+- Nest는 내장된 HttpException 클래스를 제공한다. 특정한 에러 상황이 발생했을 때 표준 HTTP 응답 객체를 보내는게 가장 좋은 방법. 
+
+```ts
+// 컨트롤러 메소드에서 에러 발생시키기
+// 두개의 인자값을 요구
+@Get()
+async findAll() {
+  // 문자열 혹은 객체 첫번째 인자
+  // 상태코드
+    throw new HttpException("Forbidden", HttpStatus.FORBIDDEN)
+}
+
+// 해당 응답
+{
+  "statusCode": 403,
+  "message": "Forbidden"
+}
+```
+
+객체를 응답 바디 전체로 덮어 씌울 수 있다 요렇게
+
+```ts
+@Get()
+async findAll() {
+    throw new HttpException({
+        status: HttpStatus.FORBIDDEN,
+        error: "Custom Message"
+    }, HttpStatus.FORBIDDEN)
+}
+```
+
+### 커스텀 예외 필터
+
+- 내장된 기본 예외 필터는 자동적으로 많은 경우를 커버하지만, 예외 레이어의 온전한 커스텀 제어를 필요로 할때도 있다. 
+- request 오브젝트에서는 오리지널 url과 로깅 정보를 포함하고, response 객체는 직접적인 응답 컨트롤을 위해 사용한다.
+- 모든 예외 필터들은 제네릭 인터페이스를 implement 해야 한다. implement 함으로써 catch 메소드를 제공하도록 함.
+
+```ts
+// http-exception.filter.ts
+
+import {
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  HttpException
+} from "@nestjs/common";
+import { Request, Response } from "express";
+
+// 커스텀 에러 필터
+@Catch(HttpException)
+export class HttpExceptionFilter implements ExceptionFilter {
+  // implement의 결과물
+  // 예외의 타입 지정
+  catch(exception: HttpException, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+    const status = exception.getStatus();
+
+    response.status(status).json({
+      statusCode: status,
+      timestamp: new Date().toISOString(),
+      path: request.url
+    });
+  }
+}
+```
+
+### 필터 바인딩
+
+- 커스텀 에러 필터를 컨트롤러에 묶는다
+- useFilter 데코레이터 안에 인스턴스말고 클래스를 넣어줘도 된다. 메모리 사용을 줄여준다고 한다. 싱글톤을 좋아하기 때무네
+- 클래스든 메소드든 이 데코레이터는 어디든 쓸 수 있다. 스코프를 달리해서 에러필터의 적용 범위를 설정할 수 있다.
+
+```ts
+@Post()
+// 역시 데코레이터로 묶는다
+@UseFilters(new HttpExceptionFilter())
+async create(@Body() createCatDto: CreateCatDto) {
+    throw new ForbiddenException()
+}
+```
+
+- 글로벌 스코프 필터는 이렇게 설정한다.
+
+```ts
+// 직접 루트모듈에 등록하거나
+import { Module } from "@nestjs/common";
+import { APP_FILTER } from "@nestjs/core";
+
+@Module({
+  provider: [
+    {
+      provide: APP_FILTER,
+      useClass: HttpExceptionFilter
+    }
+  ]
+})
+export class AppModule {}
+
+// 부트스트랩단에서 넣어주거나 
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  app.useGlobalFilters(new HttpExceptionFilter());
+  await app.listen(3000);
+}
+
+bootstrap();
+```
