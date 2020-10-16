@@ -580,5 +580,140 @@ export class AppModule{}
 
 ## 미들웨어
 
-컨트롤러 바로 전에서 동작하는 함수. 미들웨어 함수들은 애플리케이션의 req, res에 접근 가능하고 next() 미들웨어 함수에 접근할 수 있음. express랑 똑같네
+컨트롤러 바로 전(정확히는 라우터 핸들러 바로 전)에서 동작하는 함수. 미들웨어 함수들은 애플리케이션의 req, res에 접근 가능하고 next() 미들웨어 함수에 접근할 수 있음. express랑 똑같네.
+
+요청과 응답에 변화를 줄 수 있고 사이클을 끝낼 수도 있으며 next미들웨어를 불러 다음으로 넘어갈 수도 있다. 
+
+Nest에서 미들웨어는 함수이거나 injectable 데코레이터로 선언한 클래스이다(즉 프로바이더임). 클래스의 경우에는 일반적으로 미들웨어 인터페이스를 implement해야 함. 함수일때는 딱히 뭐 없음.
+
+```ts
+import { Injectable, NestMiddleware } from '@nestjs/common';
+import { Request, Response } from 'express';
+
+@Injectable()
+export class LoggerMiddleware implements NestMiddleware {
+  use(req: Request, res: Response, next: Function) {
+    console.log('Request...');
+    next();
+  }
+}
+```
+
+### 의존성 주입
+
+- Nest미들웨어는 온전하게 의존성 주입을 지원한다. Provider나 Controller처럼 같은 모듈에서 사용할 수 있는 의존성을 주입하는것이 가능.
+- 주로 constructor에 접근하여 이루어진다.
+
+### 미들웨어 적용하기
+
+```ts
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { LoggerMiddleware } from './common/middleware/logger.middleware';
+import { CatsModule } from './cats/cats.module';
+
+@Module({
+  imports: [CatsModule],
+})
+
+export class AppModule implements NestModule {
+  // configure메소드에 consumer 타입 지정
+  configure(consumer: MiddlewareConsumer) {
+    // 이런식으로 apply
+    consumer.apply(LoggerMiddleware).forRoutes('cats');
+  }
+}
+```
+
+- 모듈 클래스에 configure()메소드를 사용하여 미들웨어를 집어넣는다. 
+- NestModule 인터페이스가 필요하다. 
+- 미들웨어를 달 라우터 핸들러를 지정할 수 있다 forRoutes로.. 더 구체적으로는 아래와 같이 요청의 종류를 명시할 수도 있다.
+- 라우트 path에 와일드카드 사용도 가능하다 `forRoutes({ path: "ab*cd", method: RequestMethod.ALL });`
+`
+
+```ts
+import {
+  Module,
+  NestModule,
+  RequestMethod,
+  MiddlewareConsumer
+} from "@nestjs/common";
+import { LoggerMiddleware } from "./common/middleware/logger.middleware";
+import { CatsModule } from "./cats/cats.module";
+
+@Module({
+  imports: [CatsModule]
+})
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(LoggerMiddleware)
+      .forRoutes({ path: "cats", method: RequestMethod.GET });
+  }
+}
+```
+
+### 미들웨어 consumer
+
+- 핼퍼클래스. 몇가지 내장된 미들웨어를 관리해주는 메소드를 가지고 있다.
+- 다수의 컨트롤러 클래스를 받을 수도 있따. 체인 형태로 적용할 수 있다.
+
+```ts
+import { Module, NestModule, MiddlewareConsumer } from "@nestjs/common";
+import { LoggerMiddleware } from "./common/middleware/logger.middleware";
+import { CatsModule } from "./cats/cats.module";
+import { CatsController } from "./cats/cats.controller";
+
+@Module({
+  imports: [CatsModule]
+})
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(LoggerMiddleware).forRoutes(CatsController);
+  }
+}
+```
+
+### 미들웨어에서 라우터 제외하기
+
+```ts
+consumer
+  .apply(LoggerMiddleware)
+  .exclude(
+    { path: "cats", method: RequestMethod.GET },
+    { path: "cats", method: RequestMethod.POST },
+    "cats/(.*)"
+  )
+  .forRoutes(CatsController);
+```
+
+exclude 체이닝으로 특정 라우트를 쉽게 제외할 수 있다. 하나의 스트링, 다수의 스트링, 또는 제외될 라우팅을 결정해주는 RouteInfo 객체를 받는다.
+
+### 함수형 미들웨어
+
+```ts
+export function logger(req, res, next) {
+  console.log(`Request...`);
+  next();
+}
+```
+
+간단한 미들웨어는 클래스로 선언할 필요 없이, 멤버도 없고 추가 메서드도 없고 추가적인 의존성도 없다면 함수형으로 미들웨어를 만들 수 있다. express 미들웨어랑 똑같이 생겼다.
+
+### 다수의 미들웨어 적용하기
+
+```ts
+consumer.apply(cors(), helmet(), logger).forRoutes(CatsController);
+```
+
+여러 미들웨어를 연속적으로 동작하도록 묶어주기 위해서 쉼표로 분리된 리스트가 apply()메서드 안에 필요하다.
+
+### 글로벌 미들웨어
+
+미들웨어를 등록된 모든 라우터에 한번에 적용하려면 INestApplication 인스턴스에 의해 제공되는 use()메서드를 활용할 수 있다.
+
+```ts
+const app = await NestFactory.create(AppModule);
+app.use(logger);
+await app.listen(3000);
+```
 
