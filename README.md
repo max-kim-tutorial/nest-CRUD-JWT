@@ -577,3 +577,8 @@ import {User} from "./users/entities/user.entity";
 })
 export class AppModule{}
 ```
+
+## 미들웨어
+
+컨트롤러 바로 전에서 동작하는 함수. 미들웨어 함수들은 애플리케이션의 req, res에 접근 가능하고 next() 미들웨어 함수에 접근할 수 있음. express랑 똑같네
+
