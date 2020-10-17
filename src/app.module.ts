@@ -9,6 +9,8 @@ import Post from "./models/post.entity";
 @Module({
   imports: [
     ConfigModule.forRoot(),
+    // ormconfig도 사용 가능하다
+    // 이렇게 연결을 해주면 TypeORM connection과 EntityManager 객체는 전체 프로젝트에서 주입 가능
     TypeOrmModule.forRoot({
       type: "postgres",
       host: "localhost",
