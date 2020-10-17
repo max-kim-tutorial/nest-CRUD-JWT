@@ -13,7 +13,7 @@ import { EditPostDto } from "./interfaces/dto.interface";
 import { PostService } from "./post.service";
 
 @Controller("post")
-export class TodoController {
+export class PostController {
   constructor(private readonly postService: PostService) {}
 
   @Post()
