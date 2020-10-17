@@ -834,3 +834,27 @@ async function bootstrap() {
 
 bootstrap();
 ```
+
+## Authentication
+
+전략 패턴으로 유명한 Passport는 @nestjs/passport 모듈을 불러와서 사용한다. passport는 다음과 같은 스텝을 거쳐서 인증을 처리함
+
+- credential(패스워드)을 verify해서 처리
+- JWT처럼 auth state를 처리하는 로직을 express session을 이용해서 처리
+- 클라이언트에게 전달
+
+### requirements
+
+- 유저네임이랑 패스워드로 인증하는 상황
+- 인증이 되면, JWT 토큰을 발행하고 그 토큰을 클라이언트에서는 authorization 헤더에 계속 요청하는 방식으로 인증 진행
+- 어떤 passport 전략을 선택하던지간에, @nestjs/passport와 passport는 동시에 필요하다. 그 위에 strategy 모듈을 또 설치한다. 그리고 @types도(뭐 많네)
+- 패스포트 자체가 작은 프레임워크라고 생각하는게 좋다
+
+### implement strategies 
+
+그냥 바닐라 패스포트라면 두가지가 필요하다
+
+1. strategy 옵션
+2. verify callback : 인증 성공했을때 실패했을때 로직 정의
+
+passportStrategies라는 클래스를 extend하여 strategy를 작성할 수 있다. super()불러서 strategyOption을 상속받는다. 
