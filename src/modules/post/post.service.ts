@@ -28,7 +28,6 @@ export class PostService {
   }
   
   async editPost(id:number, editPostDto: EditPostDto) {
-    const before = await this.post.findOne(id);
     await this.post.update(id, editPostDto);
   }
 
