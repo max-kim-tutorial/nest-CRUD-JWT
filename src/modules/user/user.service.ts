@@ -4,12 +4,12 @@ import { Repository } from "typeorm";
 import User from "src/models/user.entity";
 
 @Injectable()
-export class UsersService {
+export class UserService {
   constructor(
     @InjectRepository(User) private readonly user: Repository<User>
   ) {}
 
   async findOne(username: string) {
-    return this.user.find({where:{username}});
+    return await this.user.findOne({where:{userName:username}});
   }
 }
