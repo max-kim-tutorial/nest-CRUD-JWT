@@ -2,6 +2,7 @@ import { PostModule } from './modules/post/index';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { ConfigModule } from '@nestjs/config';
+import { AuthModule } from "./modules/auth"
 import User from "./models/user.entity";
 import Post from "./models/post.entity";
 
@@ -20,7 +21,8 @@ import Post from "./models/post.entity";
       entities: [User, Post],
       synchronize: true
     }),
-    PostModule
+    PostModule,
+    AuthModule
   ],
 })
 export class AppModule {}

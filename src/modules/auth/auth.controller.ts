@@ -4,13 +4,19 @@ import { AuthService } from './auth.service';
 
 // TODO: 로그인, 회원가입, 토큰 리프레쉬
 @Controller('auth')
-export class AppController {
+export class AuthController {
   constructor(private authService: AuthService) {}
 
   @UseGuards(AuthGuard('local'))
   @Post('login')
   async login(@Request() req) {
-    return this.authService.login(req.user);
+    const {id, userName, createdAt} = req.user
+    return {
+      id,
+      userName,
+      createdAt,
+      token: this.authService.issueAccessToken(req.user),
+    };
   }
 
   @UseGuards(AuthGuard('jwt'))
