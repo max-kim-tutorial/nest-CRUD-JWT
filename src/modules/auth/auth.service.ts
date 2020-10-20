@@ -22,12 +22,13 @@ export class AuthService {
     return null;
   }
 
-  validateTokenExpired(token:string) {
-    return this.jwtService.verify(token)
-  }
-
-  decodeToken(token:string):Object {
-    return this.jwtService.decode(token)
+  async validateUserByToken(username:string) {
+    const user = await this.userService.findOne(username);
+    if(user) {
+      const { password, ...result } = user;
+      return result;
+    }
+    return null
   }
 
   issueAccessToken(user:User) {
